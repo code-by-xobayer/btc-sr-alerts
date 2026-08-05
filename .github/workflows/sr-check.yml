@@ -17,20 +17,21 @@ jobs:
 
       - run: npm install
 
+      # ---- Restore the single state file ----
       - name: Restore state cache
         uses: actions/cache@v4
         with:
           path: sr-state.json
           key: sr-state
 
+      # ---- Run the check ----
       - run: npm start
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      # ---- Save the state file using the SAME key ----
       - name: Save state cache
         uses: actions/cache@v4
         with:
           path: sr-state.json
-          key: sr-state-${{ github.run_id }}
-          restore-keys: |
-            sr-state-
+          key: sr-state
