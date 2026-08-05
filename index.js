@@ -4,8 +4,8 @@ const fs = require('fs');
 const path = require('path');
 
 // ---------- CONFIG ----------
-const SYMBOL = 'BTCUSDT';
-const INTERVAL = '1';          // Bybit: "1" = 1 minute
+const SYMBOL_MEXC = 'BTC_USDT';          // MEXC uses underscore
+const INTERVAL = 'Min1';                 // 1 minute
 const LIMIT = 500;
 const PIVOT_LEN = 4;
 
@@ -16,19 +16,24 @@ const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const FCM_TOPIC = 'sr_alert';
 
-// ---------- Fetch klines from Bybit ----------
+// ---------- Fetch klines from MEXC ----------
 async function getKlines() {
-    const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${SYMBOL}&interval=${INTERVAL}&limit=${LIMIT}`;
+    const url = `https://contract.mexc.com/api/v1/contract/kline/${SYMBOL_MEXC}?interval=${INTERVAL}&limit=${LIMIT}`;
     const res = await axios.get(url);
-    const list = res.data.result.list;
-    // Bybit returns newest first, reverse to oldest first
-    return list.reverse().map(k => ({
-        time: parseInt(k[0]),
-        open: parseFloat(k[1]),
-        high: parseFloat(k[2]),
-        low: parseFloat(k[3]),
-        close: parseFloat(k[4])
-    }));
+    const data = res.data.data;
+    // data.time, data.open, data.close, data.high, data.low are parallel arrays
+    const length = data.time.length;
+    const klines = [];
+    for (let i = 0; i < length; i++) {
+        klines.push({
+            time: data.time[i] * 1000,          // MEXC uses seconds
+            open: parseFloat(data.open[i]),
+            high: parseFloat(data.high[i]),
+            low: parseFloat(data.low[i]),
+            close: parseFloat(data.close[i])
+        });
+    }
+    return klines;
 }
 
 // ---------- Pivot / SR ----------
@@ -89,7 +94,6 @@ async function sendNotification(title, body) {
 // ---------- Main ----------
 (async () => {
     try {
-        // Load previous state
         let state = { lastSupport: null, lastResistance: null };
         if (fs.existsSync(STATE_FILE)) {
             state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
@@ -109,9 +113,8 @@ async function sendNotification(title, body) {
         }
 
         if (promises.length > 0) await Promise.all(promises);
-
-        // Save state for next run
         fs.writeFileSync(STATE_FILE, JSON.stringify(state));
+        console.log('Check complete');
     } catch (e) {
         console.error(e);
         process.exit(1);
