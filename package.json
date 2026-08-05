@@ -1,0 +1,11 @@
+{
+  "name": "btc-sr-alert",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "firebase-admin": "^11.0.0"
+  }
+}
