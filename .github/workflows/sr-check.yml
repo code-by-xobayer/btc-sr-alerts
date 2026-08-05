@@ -17,33 +17,8 @@ jobs:
 
       - run: npm install
 
-      # ---- Restore the state file ----
-      - name: Restore state cache
-        uses: actions/cache@v4
-        with:
-          path: sr-state.json
-          key: sr-state
-
-      # ---- DEBUG: show the restored state ----
-      - name: Show restored state
-        run: |
-          echo "=== Restored state ==="
-          cat sr-state.json 2>/dev/null || echo "No state file found (first run or cache empty)"
-
-      # ---- Run the check ----
       - run: npm start
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-      # ---- DEBUG: show the saved state ----
-      - name: Show saved state
-        run: |
-          echo "=== Saved state ==="
-          cat sr-state.json 2>/dev/null || echo "No state file created"
-
-      # ---- Save the state file ----
-      - name: Save state cache
-        uses: actions/cache@v4
-        with:
-          path: sr-state.json
-          key: sr-state
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_PAT: ${{ secrets.GIST_PAT }}
