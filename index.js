@@ -1,23 +1,29 @@
 const axios = require('axios');
 const admin = require('firebase-admin');
+const fs = require('fs');
+const path = require('path');
 
 // ---------- CONFIG ----------
 const SYMBOL = 'BTCUSDT';
-const INTERVAL = '1m';
+const INTERVAL = '1';          // Bybit: "1" = 1 minute
 const LIMIT = 500;
 const PIVOT_LEN = 4;
+
+const STATE_FILE = path.join(__dirname, 'sr-state.json');
 
 // ---------- Firebase init ----------
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const FCM_TOPIC = 'sr_alert';
 
-// ---------- Fetch klines ----------
+// ---------- Fetch klines from Bybit ----------
 async function getKlines() {
-    const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${SYMBOL}&interval=${INTERVAL}&limit=${LIMIT}`;
+    const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${SYMBOL}&interval=${INTERVAL}&limit=${LIMIT}`;
     const res = await axios.get(url);
-    return res.data.map(k => ({
-        time: k[0],
+    const list = res.data.result.list;
+    // Bybit returns newest first, reverse to oldest first
+    return list.reverse().map(k => ({
+        time: parseInt(k[0]),
         open: parseFloat(k[1]),
         high: parseFloat(k[2]),
         low: parseFloat(k[3]),
@@ -80,18 +86,19 @@ async function sendNotification(title, body) {
     console.log(`Sent: ${title} – ${body}`);
 }
 
-// ---------- State (persist last values between runs) ----------
-const fs = require('fs');
-const STATE_FILE = '/tmp/sr_state.json';
-let state = { lastSupport: null, lastResistance: null };
-try { state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch(e) {}
-
 // ---------- Main ----------
 (async () => {
     try {
+        // Load previous state
+        let state = { lastSupport: null, lastResistance: null };
+        if (fs.existsSync(STATE_FILE)) {
+            state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+        }
+
         const klines = await getKlines();
         const { support, resistance } = computeSR(klines);
         const promises = [];
+
         if (support !== null && support !== state.lastSupport) {
             promises.push(sendNotification('New Support', `BTC support: ${support.toFixed(2)}`));
             state.lastSupport = support;
@@ -100,7 +107,10 @@ try { state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch(e) {}
             promises.push(sendNotification('New Resistance', `BTC resistance: ${resistance.toFixed(2)}`));
             state.lastResistance = resistance;
         }
+
         if (promises.length > 0) await Promise.all(promises);
+
+        // Save state for next run
         fs.writeFileSync(STATE_FILE, JSON.stringify(state));
     } catch (e) {
         console.error(e);
