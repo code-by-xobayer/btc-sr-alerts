@@ -1,32 +1,57 @@
 const axios = require('axios');
 const admin = require('firebase-admin');
-const fs = require('fs');
-const path = require('path');
 
 // ---------- CONFIG ----------
-const SYMBOL_MEXC = 'BTC_USDT';          // MEXC uses underscore
-const INTERVAL = 'Min1';                 // 1 minute
+const SYMBOL_MEXC = 'BTC_USDT';
+const INTERVAL = 'Min1';
 const LIMIT = 500;
 const PIVOT_LEN = 4;
 
-const STATE_FILE = path.join(__dirname, 'sr-state.json');
+const GITHUB_TOKEN = process.env.GIST_PAT;            // we'll set this as a secret
+const GIST_ID = process.env.d5ec4a4e5b99b5f959f720e7b6b95a72;                  // set as secret
 
 // ---------- Firebase init ----------
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const FCM_TOPIC = 'sr_alert';
 
+// ---------- Gist helpers ----------
+const GIST_URL = `https://api.github.com/gists/${GIST_ID}`;
+const axiosGist = axios.create({
+    baseURL: 'https://api.github.com',
+    headers: {
+        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+    },
+});
+
+async function readState() {
+    const res = await axiosGist.get(`/gists/${GIST_ID}`);
+    const file = res.data.files['sr-state.json'];
+    if (!file || !file.content) return { lastSupport: null, lastResistance: null };
+    return JSON.parse(file.content);
+}
+
+async function writeState(state) {
+    await axiosGist.patch(`/gists/${GIST_ID}`, {
+        files: {
+            'sr-state.json': {
+                content: JSON.stringify(state),
+            },
+        },
+    });
+}
+
 // ---------- Fetch klines from MEXC ----------
 async function getKlines() {
     const url = `https://contract.mexc.com/api/v1/contract/kline/${SYMBOL_MEXC}?interval=${INTERVAL}&limit=${LIMIT}`;
     const res = await axios.get(url);
     const data = res.data.data;
-    // data.time, data.open, data.close, data.high, data.low are parallel arrays
     const length = data.time.length;
     const klines = [];
     for (let i = 0; i < length; i++) {
         klines.push({
-            time: data.time[i] * 1000,          // MEXC uses seconds
+            time: data.time[i] * 1000,
             open: parseFloat(data.open[i]),
             high: parseFloat(data.high[i]),
             low: parseFloat(data.low[i]),
@@ -94,11 +119,7 @@ async function sendNotification(title, body) {
 // ---------- Main ----------
 (async () => {
     try {
-        let state = { lastSupport: null, lastResistance: null };
-        if (fs.existsSync(STATE_FILE)) {
-            state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-        }
-
+        const state = await readState();
         const klines = await getKlines();
         const { support, resistance } = computeSR(klines);
         const promises = [];
@@ -113,7 +134,7 @@ async function sendNotification(title, body) {
         }
 
         if (promises.length > 0) await Promise.all(promises);
-        fs.writeFileSync(STATE_FILE, JSON.stringify(state));
+        await writeState(state);
         console.log('Check complete');
     } catch (e) {
         console.error(e);
