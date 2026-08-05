@@ -10,10 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - run: npm install
+
+      # Restore cached state file (if any)
+      - name: Restore state cache
+        uses: actions/cache@v4
+        with:
+          path: sr-state.json
+          key: sr-state
+
       - run: npm start
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # Save state file to cache
+      - name: Save state cache
+        uses: actions/cache@v4
+        with:
+          path: sr-state.json
+          key: sr-state-${{ github.run_id }}
+          restore-keys: |
+            sr-state-
