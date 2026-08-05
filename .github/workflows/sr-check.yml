@@ -17,7 +17,7 @@ jobs:
 
       - run: npm install
 
-      # Restore cached state file (if any)
+      # Restore cached state file
       - name: Restore state cache
         uses: actions/cache@v4
         with:
