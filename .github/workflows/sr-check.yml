@@ -1,9 +1,9 @@
 name: Check BTC S/R
 
 on:
-  schedule:
-    - cron: '* * * * *'
   workflow_dispatch:
+  repository_dispatch:
+    types: [sr-check]
 
 jobs:
   check:
@@ -17,7 +17,6 @@ jobs:
 
       - run: npm install
 
-      # Restore cached state file
       - name: Restore state cache
         uses: actions/cache@v4
         with:
@@ -28,7 +27,6 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      # Save state file to cache
       - name: Save state cache
         uses: actions/cache@v4
         with:
