@@ -7,8 +7,8 @@ const INTERVAL = 'Min1';
 const LIMIT = 500;
 const PIVOT_LEN = 4;
 
-const GITHUB_TOKEN = process.env.GIST_PAT;            // we'll set this as a secret
-const GIST_ID = process.env.d5ec4a4e5b99b5f959f720e7b6b95a72;                  // set as secret
+const GITHUB_TOKEN = process.env.GIST_PAT;
+const GIST_ID = process.env.GIST_ID;
 
 // ---------- Firebase init ----------
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -16,7 +16,6 @@ admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const FCM_TOPIC = 'sr_alert';
 
 // ---------- Gist helpers ----------
-const GIST_URL = `https://api.github.com/gists/${GIST_ID}`;
 const axiosGist = axios.create({
     baseURL: 'https://api.github.com',
     headers: {
@@ -73,7 +72,6 @@ function pivotHigh(highs, len) {
     }
     return pivots;
 }
-
 function pivotLow(lows, len) {
     const pivots = [];
     for (let i = len; i < lows.length - len; i++) {
@@ -85,7 +83,6 @@ function pivotLow(lows, len) {
     }
     return pivots;
 }
-
 function computeSR(klines) {
     const highs = klines.map(k => k.high);
     const lows = klines.map(k => k.low);
